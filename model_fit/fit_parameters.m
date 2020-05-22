@@ -5,7 +5,7 @@ clearvars
 close all
 
 %% Input set up
-fitparwave = 'Behavior data fitpar_08270119';
+fitparwave = '05222020';
 search = 'grid'; % which method for searching optimal parameters
 model = 'ambigNrisk'; % which utility function
 isconstrained = 0; % if use constrained fitting. 0-unconstrained, 1-constrained, 2-both
@@ -15,19 +15,19 @@ includeAmbig = 0; % whether to include ambiguous trials or not
 %% Set up loading + subject selection
 % TODO: Maybe grab & save condition somewhere?
 
-root = 'D:\Ruonan\Projects in the lab\VA_RA_PTB\Analysis Ruonan'; % Need to change if doing analysis in different folders
-data_path = fullfile(root, 'Behavior data of PTB log/'); % root of folders is sufficient
-fitpar_out_path = fullfile(root,'Fitpar files', fitparwave);
+root = 'Z:\Lab_Projects\mturk_Columbia\script\'; % Need to change if doing analysis in different folders
+data_path = fullfile(root, 'test_data'); % root of folders is sufficient
+fitpar_out_path = fullfile(root,'model_fit_results', fitparwave);
 %graph_out_path  = fullfile(root, 'ChoiceGraphs/');
 
 if exist(fitpar_out_path)==0
-    mkdir(fullfile(root,'Fitpar files'),fitparwave)
+    mkdir(fullfile(root,'model_fit_results'),fitparwave)
 end
 
 addpath(genpath(data_path)); % generate path for all the subject data folder
 
 subjects = getSubjectsInDir(data_path, 'subj');
-exclude = [77 1218]; 
+exclude = []; 
 % 76-81, PRE-MB. 
 % 1218: missing many trials and did not complete study. 
 % 77, 95 incomplete data
@@ -37,14 +37,15 @@ exclude = [77 1218];
 subjects = subjects(~ismember(subjects, exclude));
 % subjects = [95];
 % idx95 = find(subjects == 95);
-subjects = subjects(60:length(subjects));
+% subjects = subjects(60:length(subjects));
 
 % for refitting the subjects needing constraints
 % subjects = [3 120 1210 1220 1272 1301 1357 1360 1269 1337 1347 1354];
-subjects = [1072];
+% subjects = [1072];
 
 % poolobj = parpool('local', 8);
 
+%%
 tic
 
 for subj_idx = 1:length(subjects)
