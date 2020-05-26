@@ -10,13 +10,13 @@ search = 'grid'; % which method for searching optimal parameters
 model = 'ambigNrisk'; % which utility function
 isconstrained = 0; % if use constrained fitting. 0-unconstrained, 1-constrained, 2-both
 isdivided = 0; % if fit model to data for each day. 0-fit model on all data, 1-fit model on each day's data should get two values per subject for each parameter
-includeAmbig = 0; % whether to include ambiguous trials or not
+includeAmbig = 1; % whether to include ambiguous trials or not
 
 %% Set up loading + subject selection
 % TODO: Maybe grab & save condition somewhere?
 
-root = 'Z:\Lab_Projects\mturk_Columbia\script\'; % Need to change if doing analysis in different folders
-data_path = fullfile(root, 'test_data'); % root of folders is sufficient
+root = 'Z:\Lab_Projects\mturk_Columbia\behavioral\'; % Need to change if doing analysis in different folders
+data_path = fullfile(root, 'data_by_0518_25sub'); % root of folders is sufficient
 fitpar_out_path = fullfile(root,'model_fit_results', fitparwave);
 %graph_out_path  = fullfile(root, 'ChoiceGraphs/');
 
@@ -26,7 +26,7 @@ end
 
 addpath(genpath(data_path)); % generate path for all the subject data folder
 
-subjects = getSubjectsInDir(data_path, 'subj');
+subjects = getSubjectsInDir(data_path, 'risk');
 exclude = []; 
 % 76-81, PRE-MB. 
 % 1218: missing many trials and did not complete study. 
