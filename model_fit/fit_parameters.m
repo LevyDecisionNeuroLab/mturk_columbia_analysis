@@ -5,7 +5,7 @@ clearvars
 close all
 
 %% Input set up
-fitparwave = '05222020';
+fitparwave = '06122020';
 search = 'grid'; % which method for searching optimal parameters
 model = 'ambigNrisk'; % which utility function
 isconstrained = 0; % if use constrained fitting. 0-unconstrained, 1-constrained, 2-both
@@ -26,22 +26,12 @@ end
 
 addpath(genpath(data_path)); % generate path for all the subject data folder
 
-subjects = getSubjectsInDir(data_path, 'risk');
-exclude = []; 
-% 76-81, PRE-MB. 
-% 1218: missing many trials and did not complete study. 
-% 77, 95 incomplete data
-% need to do 95, incomplete data
-% 1269 GL/GL
+[subjects, datanames] = getSubjectsInDir(data_path, 'risk');
 
-subjects = subjects(~ismember(subjects, exclude));
-% subjects = [95];
-% idx95 = find(subjects == 95);
-% subjects = subjects(60:length(subjects));
+% exclude = []; 
+% subjects = subjects(~ismember(subjects, exclude));
 
 % for refitting the subjects needing constraints
-% subjects = [3 120 1210 1220 1272 1301 1357 1360 1269 1337 1347 1354];
-% subjects = [1072];
 
 % poolobj = parpool('local', 8);
 
@@ -49,18 +39,17 @@ subjects = subjects(~ismember(subjects, exclude));
 tic
 
 for subj_idx = 1:length(subjects)
-%     domains = {'LOSS'};
-    domains = {'GAINS', 'LOSS'};
-
-  for domain_idx = 1:length(domains)
-    subjectNum = subjects(subj_idx);
-    domain = domains{domain_idx};
+    %% read data and clean   
+    subj_idx = 1;
+    subjectNum = subjects{subj_idx};
     
-%     subjectNum = 1210;
-%     domain = 'GAINS';
-
-    Data = load_mat(subjectNum, domain);
+    dataname = datanames{subj_idx};
     
+    Data = readtable(dataname);
+
+    choice_data = Data(1:height(Data)-1, 1:8);
+    bonus_data = Data(end, 9:13); % from YTL: (end, 9:13) was (121, 9:13)
+
     %% Refine variables
 
     % Exclude non-responses and test questions (where lottery value < fixed value)
@@ -75,21 +64,21 @@ for subj_idx = 1:length(subjects)
         include_indices_all = and(Data.choice ~= 0, Data.vals' ~= 4);
         idx_only4_all = and(Data.choice ~= 0, Data.vals' == 4);
     end
-        
+
     if subjectNum == 95 && strcmp(domain, 'LOSS')
         choice_all = choiceDone;
     else
         choice_all = Data.choice;
     end
-       
+
     values_all = Data.vals;
     ambigs_all = Data.ambigs;
     probs_all  = Data.probs;
-    
+
     %% Divide data and fit data for each day separately
     % this should be done before cleaning data, because the trials with
     % missing responses will be exlcuded after data cleaning
-%     ntrials_day = length(values_all)/2;
+    %     ntrials_day = length(values_all)/2;
     ntrials_day = 62;
     if isdivided == 1
         for day = 1:2
@@ -109,17 +98,17 @@ for subj_idx = 1:length(subjects)
             include_indices_bothday = include_indices_all;
             idx_only4_bothday = idx_only4_all;
     end
-       
+
     % clean and fit data for each day
     for day = 1 : size(values_bothday, 2)        
         %% Clean data 
-        
+
         % exclude trials with value = 4 and with no resposne
         choice = choice_bothday(day,include_indices_bothday(day,:));
         values = values_bothday(include_indices_bothday(day,:)',day);
         ambigs = ambigs_bothday(include_indices_bothday(day,:)',day);
         probs = probs_bothday(include_indices_bothday(day,:)',day);
-        
+
         % Side with lottery is counterbalanced across subjects 
         % -> code 0 as reference choice, 1 as lottery choice
         % TODO: Double-check this is so? - This is true(RJ)
@@ -134,7 +123,7 @@ for subj_idx = 1:length(subjects)
               choice(choice == 2) = 1;
           end
         % end
-        
+
         choice4 = choice_bothday(day, idx_only4_bothday(day,:));
         values4 = values_bothday(idx_only4_bothday(day,:)', day);
         ambigs4 = ambigs_bothday(idx_only4_bothday(day,:)', day);
@@ -193,7 +182,7 @@ for subj_idx = 1:length(subjects)
 
         refVal = fixed_valueP * ones(length(choice), 1);
         refProb = fixed_prob  * ones(length(choice), 1);        
-        
+
         %% Fit model
 
         % Two versions of function, calculate both the unconstrained and constrained fittings:
@@ -237,7 +226,7 @@ for subj_idx = 1:length(subjects)
 
             disp(['Subject ' num2str(subjectNum) ' constrained fitting completed'])
         end
-        
+
         %% Create choice matrices
 
         % One matrix per condition. Matrix values are binary (0 for sure
@@ -285,7 +274,7 @@ for subj_idx = 1:length(subjects)
                 end
             end
         end
-        
+
         riskyChoices_byLevel = zeros(1, length(prob));
         ambigChoices_byLevel = zeros(1, length(ambig));
         % Creat risky/ambig choiecs by level (nonparametric), excluding the value 5
@@ -295,12 +284,12 @@ for subj_idx = 1:length(subjects)
         for i=1:length(ambig)
             ambigChoices_byLevel(1,i) = nanmean(ambigChoicesP(i,2:length(ambigChoicesP)));
         end        
-        
+
         %% Save generated values
         if isdivided == 1   
-            
+
             if day == 1
-                
+
                 Data.day1.riskyChoices = riskyChoicesP;
                 Data.day1.ambigChoices = ambigChoicesP;
 
@@ -326,7 +315,7 @@ for subj_idx = 1:length(subjects)
                 Data.day1.ambigChoices_byLevel=ambigChoices_byLevel;
 
             elseif day == 2
-                
+
                 Data.day2.riskyChoices = riskyChoicesP;
                 Data.day2.ambigChoices = ambigChoicesP;
 
@@ -351,9 +340,9 @@ for subj_idx = 1:length(subjects)
                 Data.day2.riskyChoices_byLevel= riskyChoices_byLevel;
                 Data.day2.ambigChoices_byLevel=ambigChoices_byLevel;
             end
-            
+
         elseif isdivided == 0
-            
+
             Data.riskyChoices = riskyChoicesP;
             Data.ambigChoices = ambigChoicesP;
 
@@ -379,11 +368,9 @@ for subj_idx = 1:length(subjects)
             Data.ambigChoices_byLevel=ambigChoices_byLevel;  
 
         end        
-        
+
         save_mat(Data, subjectNum, domain, fitpar_out_path);
-  
     end
-  end
 end
 
 toc
