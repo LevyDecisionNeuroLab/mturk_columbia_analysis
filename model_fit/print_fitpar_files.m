@@ -6,26 +6,26 @@ close all
 %addpath(genpath('C:\Users\lr382\Desktop\Lital\RISK-VA\Behavior for PTB\'));
 
 %Input
-fitparwave = 'Behavior data fitpar_08150219';
-outputwave = '_08150219';
-isconstrained = 1;
-isdivided = 1; % if fit model to data for each day. 0-fit model on all data, 1-fit model on each day's data should get two values per subject for each parameter
+fitparwave = '05222020';
+outputwave = '05222020';
+isconstrained = 0;
+isdivided = 0; % if fit model to data for each day. 0-fit model on all data, 1-fit model on each day's data should get two values per subject for each parameter
 
 % exclude should match those in the fit_parameters.m script
-exclude = [77 1218]; 
+exclude = []; 
 % TEMPORARY: subjects incomplete data (that the script is not ready for)
 
 %% folder and subjects
-root = 'D:\Ruonan\Projects in the lab\VA_RA_PTB\Analysis Ruonan';
-data_path = fullfile(root, 'Behavior data of PTB log/'); % Original log from PTB
+root = 'Z:\Lab_Projects\mturk_Columbia\script\';
+data_path = fullfile(root, 'test_data'); % Original log from PTB
 subjects = getSubjectsInDir(data_path, 'subj'); %function
 subjects = subjects(~ismember(subjects, exclude));
 
 % subjects = [3, 120, 1210, 1220, 1272, 1301, 1357, 1360, 1269, 1337, 1347, 1354];
-subjects = [3 81 120 1300 1074 1216 1338 1345 1069];
+% subjects = [3 81 120 1300 1074 1216 1338 1345 1069];
 
 % subjects = [1210];
-path = fullfile(root, 'Fitpar files', fitparwave, filesep);
+path = fullfile(root, 'model_fit_results', fitparwave, filesep);
 cd(path)
 
 % defining monetary values
