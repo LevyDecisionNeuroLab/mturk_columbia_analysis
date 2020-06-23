@@ -5,20 +5,22 @@ clearvars
 close all
 
 %% Input set up
-fitparwave = '06122020';
+fitparwave = 'data_test_3sub';
 search = 'grid'; % which method for searching optimal parameters
 model = 'ambigNrisk'; % which utility function
 isconstrained = 0; % if use constrained fitting. 0-unconstrained, 1-constrained, 2-both
-isdivided = 0; % if fit model to data for each day. 0-fit model on all data, 1-fit model on each day's data should get two values per subject for each parameter
 includeAmbig = 1; % whether to include ambiguous trials or not
 
 %% Set up loading + subject selection
 % TODO: Maybe grab & save condition somewhere?
 
 root = 'Z:\Lab_Projects\mturk_Columbia\behavioral\'; % Need to change if doing analysis in different folders
-data_path = fullfile(root, 'data_by_0518_25sub'); % root of folders is sufficient
+data_path = fullfile(root, fitparwave); % root of folders is sufficient
 fitpar_out_path = fullfile(root,'model_fit_results', fitparwave);
 %graph_out_path  = fullfile(root, 'ChoiceGraphs/');
+
+summary_file = fullfile(fitpar_out_path, ['param_nonparam_' fitparwave '.txt']); % parametric and nonparametric risk and ambig attitudes
+choiceData_file = fullfile(fitpar_out_path, ['choice_data_' fitparwave '.xls']); % choice matrix
 
 if exist(fitpar_out_path)==0
     mkdir(fullfile(root,'model_fit_results'),fitparwave)
@@ -42,7 +44,6 @@ tic
 
 for subj_idx = 1:length(subjects)
     %% read data and clean   
-    subj_idx = 1;
     subjectNum = subjects{subj_idx};
     
     dataname = datanames{subj_idx};
@@ -59,8 +60,8 @@ for subj_idx = 1:length(subjects)
     ambigs_all = choice_data.trial_uncertainty;
     probs_all  = choice_data.trial_uncertainty;
     % correct uncertainty
-    ambigs_all(strcmp(choice_data.trial_type(trial_id), 'risk')) = 0;
-    probs_all(strcmp(choice_data.trial_type(trial_id), 'ambiguity')) = 0.5;
+    ambigs_all(strcmp(choice_data.trial_type, 'risk')) = 0;
+    probs_all(strcmp(choice_data.trial_type, 'ambiguity')) = 0.5;
 
     % choices
     % !TODO Check if there are missing responses
@@ -126,7 +127,7 @@ for subj_idx = 1:length(subjects)
     % Two versions of function, calculate both the unconstrained and constrained fittings:
     % fit_ambgiNrisk_model: unconstrained
     if isconstrained == 0 || isconstrained == 2
-        [info_uncstr, p_uncstr] = fit_ambigNrisk_model(choice, ...
+        [info_uncstr, p_uncstr] = fit_ambigNrisk_model(choice', ...
             refVal', ...
             values', ...
             refProb', ...
@@ -141,13 +142,13 @@ for subj_idx = 1:length(subjects)
         b_uncstr = info_uncstr.b(2);
         r2_uncstr = info_uncstr.r2;
 
-        disp(['Subject ' num2str(subjectNum) ' unconstrained fitting completed'])
+        disp(['Subject ' subjectNum ' unconstrained fitting completed'])
 
     end
 
     if isconstrained == 1 || isconstrained == 2
         % fit_ambigNrisk_model_Constrained: constrained on alpha and beta    
-        [info_cstr, p_cstr] = fit_ambigNrisk_model_Constrained(choice, ...
+        [info_cstr, p_cstr] = fit_ambigNrisk_model_Constrained(choice', ...
             refVal', ...
             values', ...
             refProb', ...
@@ -162,7 +163,7 @@ for subj_idx = 1:length(subjects)
         b_cstr = info_cstr.b(2);
         r2_cstr = info_cstr.r2;
 
-        disp(['Subject ' num2str(subjectNum) ' constrained fitting completed'])
+        disp(['Subject ' subjectNum ' constrained fitting completed'])
     end
 
     %% Create choice matrices
@@ -223,92 +224,53 @@ for subj_idx = 1:length(subjects)
         ambigChoices_byLevel(1,i) = nanmean(ambigChoicesP(i,2:length(ambigChoicesP)));
     end        
 
-    %% Save generated values
-    if isdivided == 1   
+    %% Write results into files
+ 
+    % both constrained and unconstrained
+    if isconstrained == 2
+        % results file
+%         fid = fopen([path summary_file],'w')
+%         fprintf(fid,'\tPar_unconstrained\t\t\t\t\t\t\t\t\t\t\t\t\t\tPar_constrained\t\t\t\t\t\t\t\t\t\t\t\t\t\tNonPar\n')
+%         fprintf(fid,'subject\tgains\t\t\t\t\t\t\tlosses\t\t\t\t\t\t\tgains\t\t\t\t\t\t\tlosses\t\t\t\t\t\t\tgains\t\t\t\t\t\tlosses\n')
+%         fprintf(fid,'\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\tG_risk25\tG_risk50\tG_risk75\tG_amb24\tG_amb50\tG_amb74\tL_risk25\tL_risk50\tL_risk75\tL_amb24\tL_amb50\tL_amb74\n')
+    end
 
-        if day == 1
-
-            Data.day1.riskyChoices = riskyChoicesP;
-            Data.day1.ambigChoices = ambigChoicesP;
-
-            Data.day1.choiceProb4 = choice_prob_4;
-
-            if isconstrained == 0 || isconstrained == 2
-                Data.day1.MLE_uncstr = info_uncstr;
-                Data.day1.alpha_uncstr = info_uncstr.b(3);
-                Data.day1.beta_uncstr = info_uncstr.b(2);
-                Data.day1.gamma_uncstr = info_uncstr.b(1);
-                Data.day1.r2_uncstr = info_uncstr.r2;
-            end
-
-            if isconstrained == 1 || isconstrained == 2
-                Data.day1.MLE_cstr = info_cstr;
-                Data.day1.alpha_cstr = info_cstr.b(3);
-                Data.day1.beta_cstr = info_cstr.b(2);
-                Data.day1.gamma_cstr = info_cstr.b(1);
-                Data.day1.r2_cstr = info_cstr.r2;
-            end
-
-            Data.day1.riskyChoices_byLevel= riskyChoices_byLevel;
-            Data.day1.ambigChoices_byLevel=ambigChoices_byLevel;
-
-        elseif day == 2
-
-            Data.day2.riskyChoices = riskyChoicesP;
-            Data.day2.ambigChoices = ambigChoicesP;
-
-            Data.day2.choiceProb4 = choice_prob_4;
-
-            if isconstrained == 0 || isconstrained == 2
-                Data.day2.MLE_uncstr = info_uncstr;
-                Data.day2.alpha_uncstr = info_uncstr.b(3);
-                Data.day2.beta_uncstr = info_uncstr.b(2);
-                Data.day2.gamma_uncstr = info_uncstr.b(1);
-                Data.day2.r2_uncstr = info_uncstr.r2;
-            end
-
-            if isconstrained == 1 || isconstrained == 2
-                Data.day2.MLE_cstr = info_cstr;
-                Data.day2.alpha_cstr = info_cstr.b(3);
-                Data.day2.beta_cstr = info_cstr.b(2);
-                Data.day2.gamma_cstr = info_cstr.b(1);
-                Data.day2.r2_cstr = info_cstr.r2;
-            end
-
-            Data.day2.riskyChoices_byLevel= riskyChoices_byLevel;
-            Data.day2.ambigChoices_byLevel=ambigChoices_byLevel;
+    % unconstrained
+    if isconstrained == 0
+        % results file
+        if subj_idx == 1 % write header
+            fid = fopen(summary_file,'w')
+            fprintf(fid,'mturk_id\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\texitflag\tmodel\toptimizer\trisk25\trisk50\trisk75\tamb24\tamb50\tamb74\n');
         end
+        
+        %write into param text file
+        fprintf(fid,'%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n',...
+           subjectNum, info_uncstr.b(3), info_uncstr.b(2), info_uncstr.b(1),...
+            info_uncstr.r2, info_uncstr.LL, info_uncstr.AIC, info_uncstr.BIC, ...
+            info_uncstr.exitflag, info_uncstr.model, info_uncstr.optimizer,...
+            riskyChoices_byLevel,ambigChoices_byLevel);
 
-    elseif isdivided == 0
+    end
 
-        Data.riskyChoices = riskyChoicesP;
-        Data.ambigChoices = ambigChoicesP;
+    % constrained
+    if isconstrained == 1
+        % results file
+%         fid = fopen([path summary_file],'w')
+%         fprintf(fid,'\tPar_constrained\n')
+%         fprintf(fid,'subject\tgains\t\t\t\t\t\t\tlosses\t\t\t\t\t\t\tgains\t\t\t\t\t\tlosses\n')
+%         fprintf(fid,'\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\tG_risk25\tG_risk50\tG_risk75\tG_amb24\tG_amb50\tG_amb74\tL_risk25\tL_risk50\tL_risk75\tL_amb24\tL_amb50\tL_amb74\n')
+    end
+    
+    choices_allP = [riskyChoicesP; ambigChoicesP];
+    all_data_subject = [valueP'; choices_allP];
 
-        Data.choiceProb4 = choice_prob_4;
-
-        if isconstrained == 0 || isconstrained == 2
-            Data.MLE_uncstr = info_uncstr;
-            Data.alpha_uncstr = info_uncstr.b(3);
-            Data.beta_uncstr = info_uncstr.b(2);
-            Data.gamma_uncstr = info_uncstr.b(1);
-            Data.r2_uncstr = info_uncstr.r2;
-        end
-
-        if isconstrained == 1 || isconstrained == 2
-            Data.MLE_cstr = info_cstr;
-            Data.alpha_cstr = info_cstr.b(3);
-            Data.beta_cstr = info_cstr.b(2);
-            Data.gamma_cstr = info_cstr.b(1);
-            Data.r2_cstr = info_cstr.r2;
-        end
-
-        Data.riskyChoices_byLevel= riskyChoices_byLevel;
-        Data.ambigChoices_byLevel=ambigChoices_byLevel;  
-
-    end        
-
-    save_mat(Data, subjectNum, domain, fitpar_out_path);
+    dlmwrite(choiceData_file, subjectNum , '-append', 'roffset', 1, 'delimiter', ' ');  
+    dlmwrite(choiceData_file, all_data_subject, 'coffset', 1, '-append', 'delimiter', '\t');
+    
+%     save_mat(Data, subjectNum, domain, fitpar_out_path);
 end
+
+fclose(fid)
 
 toc
 
