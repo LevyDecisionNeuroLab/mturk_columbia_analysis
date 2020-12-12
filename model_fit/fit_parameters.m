@@ -37,21 +37,21 @@ addpath(genpath(data_path)); % generate path for all the subject data folder
 [subjects, datanames] = getSubjectsInDir(data_path, 'risk');
 
 % take out subjects for rerunning
-temp = load('mturk_id.mat');
-exclude = temp.mturk_id;
-
-rerun_idx = zeros(121, 1);
-count = 0;
-
-for missing = 1:length(exclude)
-    if isempty(exclude{missing})
-        count = count + 1;
-        rerun_idx(count) = missing;
-    end
-end
-
-subjects = subjects(rerun_idx);
-datanames = datanames(rerun_idx);
+% temp = load('mturk_id.mat');
+% exclude = temp.mturk_id;
+% 
+% rerun_idx = zeros(121, 1);
+% count = 0;
+% 
+% for missing = 1:length(exclude)
+%     if isempty(exclude{missing})
+%         count = count + 1;
+%         rerun_idx(count) = missing;
+%     end
+% end
+% 
+% subjects = subjects(rerun_idx);
+% datanames = datanames(rerun_idx);
 
 % for refitting the subjects needing constraints
 
@@ -81,6 +81,7 @@ risk75 = zeros(length(subjects),1);
 amb24 = zeros(length(subjects),1);
 amb50 = zeros(length(subjects),1);
 amb74 = zeros(length(subjects),1);
+error = zeros(length(subjects),1);
 
 parfor subj_idx = 1:length(subjects)
     %% read data and clean
@@ -262,7 +263,9 @@ parfor subj_idx = 1:length(subjects)
     end
     for i=1:length(ambig)
         ambigChoices_byLevel(1,i) = nanmean(ambigChoicesP(i,2:length(ambigChoicesP)));
-    end        
+    end
+    
+
 
     %% Write results into files
 
@@ -299,7 +302,7 @@ parfor subj_idx = 1:length(subjects)
         amb24(subj_idx) = ambigChoices_byLevel(1);
         amb50(subj_idx) = ambigChoices_byLevel(2);
         amb74(subj_idx) = ambigChoices_byLevel(3);
-
+        error(subj_idx) = nanmean([nanmean(riskyChoicesP(:,1)), nanmean(ambigChoicesP(:,1))]);
     end
 
     % constrained
@@ -331,13 +334,13 @@ end
 
 % write output into file
 output = table(mturk_id, alpha, beta, gamma, r2, LL, AIC, BIC, exitflag, ...
-    model_name, optimizer, risk25, risk50, risk75, amb24, amb50, amb74);
+    model_name, optimizer, risk25, risk50, risk75, amb24, amb50, amb74, error);
 
-% writetable(output, summary_file,'Delimiter',',') 
-writetable(output,...
-    'Z:\Lab_Projects\mturk_Columbia\behavioral\model_fit_results\data_by_12082020_500sub\param_nonparam_data_by_12082020_500sub_rerun.csv',...
-    'Delimiter',',') 
+writetable(output, summary_file,'Delimiter',',') 
+% writetable(output,...
+%     'Z:\Lab_Projects\mturk_Columbia\behavioral\model_fit_results\data_by_12082020_500sub\param_nonparam_data_by_12082020_500sub_error.csv',...
+%     'Delimiter',',') 
 
 toc
 
-% delete(poolobj)
+delete(poolobj)
