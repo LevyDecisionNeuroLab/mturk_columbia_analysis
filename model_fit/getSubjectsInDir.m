@@ -21,7 +21,4 @@ for k = 1 : length(subj_dirs)
 
 end
 
-% sort
-subjects = sort(subjects);
-
 end

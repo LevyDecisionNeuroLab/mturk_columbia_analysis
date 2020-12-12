@@ -5,11 +5,10 @@ clearvars
 close all
 
 %% Input set up
-fitparwave = 'data_test_3sub';
+fitparwave = 'data_by_12082020_500sub';
 search = 'grid'; % which method for searching optimal parameters
 model = 'ambigNrisk'; % which utility function
-isconstrained = 0; % if use constrained fitting. 0-unconstrained, 1-constrained, 2-both
-includeAmbig = 1; % whether to include ambiguous trials or not
+isconstrained = 0; % if use constrained fitting. 0-unconstrained, 1-constrained
 
 %% Set up loading + subject selection
 % TODO: Maybe grab & save condition somewhere?
@@ -19,8 +18,14 @@ data_path = fullfile(root, fitparwave); % root of folders is sufficient
 fitpar_out_path = fullfile(root,'model_fit_results', fitparwave);
 %graph_out_path  = fullfile(root, 'ChoiceGraphs/');
 
-summary_file = fullfile(fitpar_out_path, ['param_nonparam_' fitparwave '.txt']); % parametric and nonparametric risk and ambig attitudes
-choiceData_file = fullfile(fitpar_out_path, ['choice_data_' fitparwave '.xls']); % choice matrix
+% output file names
+if isconstrained == 1
+    summary_file = fullfile(fitpar_out_path, ['param_nonparam_' fitparwave '_constrained.csv']); % parametric and nonparametric risk and ambig attitudes
+    choiceData_file = fullfile(fitpar_out_path, ['choice_data_' fitparwave '_constrained.xls']); % choice matrix
+else
+    summary_file = fullfile(fitpar_out_path, ['param_nonparam_' fitparwave '.csv']); % parametric and nonparametric risk and ambig attitudes
+    choiceData_file = fullfile(fitpar_out_path, ['choice_data_' fitparwave '.xls']); % choice matrix
+end
 
 if exist(fitpar_out_path)==0
     mkdir(fullfile(root,'model_fit_results'),fitparwave)
@@ -31,19 +36,54 @@ addpath(genpath(data_path)); % generate path for all the subject data folder
 % get MTurker IDs and file names
 [subjects, datanames] = getSubjectsInDir(data_path, 'risk');
 
-% exclude subjects
-% exclude = []; 
-% subjects = subjects(~ismember(subjects, exclude));
+% take out subjects for rerunning
+temp = load('mturk_id.mat');
+exclude = temp.mturk_id;
+
+rerun_idx = zeros(121, 1);
+count = 0;
+
+for missing = 1:length(exclude)
+    if isempty(exclude{missing})
+        count = count + 1;
+        rerun_idx(count) = missing;
+    end
+end
+
+subjects = subjects(rerun_idx);
+datanames = datanames(rerun_idx);
 
 % for refitting the subjects needing constraints
 
-% poolobj = parpool('local', 8);
+poolobj = parpool('local', 8);
 
 %%
 tic
 
-for subj_idx = 1:length(subjects)
-    %% read data and clean   
+% fid = fopen(summary_file,'w')
+% fprintf(fid,'mturk_id\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\texitflag\tmodel\toptimizer\trisk25\trisk50\trisk75\tamb24\tamb50\tamb74\n');
+
+% table to save outputs
+mturk_id = cell(length(subjects),1);
+alpha = zeros(length(subjects),1);
+beta = zeros(length(subjects),1);
+gamma = zeros(length(subjects),1);
+r2 = zeros(length(subjects),1);
+LL = zeros(length(subjects),1);
+AIC = zeros(length(subjects),1);
+BIC = zeros(length(subjects),1);
+exitflag = zeros(length(subjects),1);
+model_name = cell(length(subjects),1);
+optimizer = cell(length(subjects),1);
+risk25 = zeros(length(subjects),1);
+risk50 = zeros(length(subjects),1);
+risk75 = zeros(length(subjects),1);
+amb24 = zeros(length(subjects),1);
+amb50 = zeros(length(subjects),1);
+amb74 = zeros(length(subjects),1);
+
+parfor subj_idx = 1:length(subjects)
+    %% read data and clean
     subjectNum = subjects{subj_idx};
     
     dataname = datanames{subj_idx};
@@ -126,7 +166,7 @@ for subj_idx = 1:length(subjects)
 
     % Two versions of function, calculate both the unconstrained and constrained fittings:
     % fit_ambgiNrisk_model: unconstrained
-    if isconstrained == 0 || isconstrained == 2
+    if isconstrained == 0
         [info_uncstr, p_uncstr] = fit_ambigNrisk_model(choice', ...
             refVal', ...
             values', ...
@@ -146,7 +186,7 @@ for subj_idx = 1:length(subjects)
 
     end
 
-    if isconstrained == 1 || isconstrained == 2
+    if isconstrained == 1
         % fit_ambigNrisk_model_Constrained: constrained on alpha and beta    
         [info_cstr, p_cstr] = fit_ambigNrisk_model_Constrained(choice', ...
             refVal', ...
@@ -192,7 +232,7 @@ for subj_idx = 1:length(subjects)
         for j = 1:length(valueP)
             selection = find(ambigs == ambig(i) & values == valueP(j));
             if ~isempty(selection)
-                ambigChoicesP(i, j) = choice(selection);
+                ambigChoicesP(i, j) = nanmean(choice(selection));
             else
                 ambigChoicesP(i, j) = NaN;
             end
@@ -207,7 +247,7 @@ for subj_idx = 1:length(subjects)
         for j = 1:length(valueP)
             selection = find(probs == prob(i) & values == valueP(j) & ambigs == 0);
             if ~isempty(selection)
-                riskyChoicesP(i, j) = choice(selection);
+                riskyChoicesP(i, j) = nanmean(choice(selection));
             else
                 riskyChoicesP(i, j) = NaN;
             end
@@ -225,40 +265,57 @@ for subj_idx = 1:length(subjects)
     end        
 
     %% Write results into files
- 
-    % both constrained and unconstrained
-    if isconstrained == 2
-        % results file
-%         fid = fopen([path summary_file],'w')
-%         fprintf(fid,'\tPar_unconstrained\t\t\t\t\t\t\t\t\t\t\t\t\t\tPar_constrained\t\t\t\t\t\t\t\t\t\t\t\t\t\tNonPar\n')
-%         fprintf(fid,'subject\tgains\t\t\t\t\t\t\tlosses\t\t\t\t\t\t\tgains\t\t\t\t\t\t\tlosses\t\t\t\t\t\t\tgains\t\t\t\t\t\tlosses\n')
-%         fprintf(fid,'\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\tG_risk25\tG_risk50\tG_risk75\tG_amb24\tG_amb50\tG_amb74\tL_risk25\tL_risk50\tL_risk75\tL_amb24\tL_amb50\tL_amb74\n')
-    end
 
     % unconstrained
     if isconstrained == 0
         % results file
-        if subj_idx == 1 % write header
-            fid = fopen(summary_file,'w')
-            fprintf(fid,'mturk_id\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\texitflag\tmodel\toptimizer\trisk25\trisk50\trisk75\tamb24\tamb50\tamb74\n');
-        end
+%         if subj_idx == 1 % write header
+%             fid = fopen(summary_file,'w')
+%             fprintf(fid,'mturk_id\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\texitflag\tmodel\toptimizer\trisk25\trisk50\trisk75\tamb24\tamb50\tamb74\n');
+%         end
         
         %write into param text file
-        fprintf(fid,'%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n',...
-           subjectNum, info_uncstr.b(3), info_uncstr.b(2), info_uncstr.b(1),...
-            info_uncstr.r2, info_uncstr.LL, info_uncstr.AIC, info_uncstr.BIC, ...
-            info_uncstr.exitflag, info_uncstr.model, info_uncstr.optimizer,...
-            riskyChoices_byLevel,ambigChoices_byLevel);
+%         fprintf(fid,'%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n',...
+%            subjectNum, info_uncstr.b(3), info_uncstr.b(2), info_uncstr.b(1),...
+%             info_uncstr.r2, info_uncstr.LL, info_uncstr.AIC, info_uncstr.BIC, ...
+%             info_uncstr.exitflag, info_uncstr.model, info_uncstr.optimizer,...
+%             riskyChoices_byLevel,ambigChoices_byLevel);
+        
+        % save
+        mturk_id{subj_idx} = subjectNum;
+        alpha(subj_idx) = info_uncstr.b(3);
+        beta(subj_idx) = info_uncstr.b(2);
+        gamma(subj_idx) = info_uncstr.b(1);
+        r2(subj_idx) = info_uncstr.r2;
+        LL(subj_idx) = info_uncstr.LL;
+        AIC(subj_idx) = info_uncstr.AIC;
+        BIC(subj_idx) = info_uncstr.BIC;
+        exitflag(subj_idx) = info_uncstr.exitflag;
+        model_name{subj_idx} = info_uncstr.model;
+        optimizer{subj_idx} = info_uncstr.optimizer;
+        risk25(subj_idx) = riskyChoices_byLevel(1);
+        risk50(subj_idx) = riskyChoices_byLevel(2);
+        risk75(subj_idx) = riskyChoices_byLevel(3);
+        amb24(subj_idx) = ambigChoices_byLevel(1);
+        amb50(subj_idx) = ambigChoices_byLevel(2);
+        amb74(subj_idx) = ambigChoices_byLevel(3);
 
     end
 
     % constrained
     if isconstrained == 1
         % results file
-%         fid = fopen([path summary_file],'w')
-%         fprintf(fid,'\tPar_constrained\n')
-%         fprintf(fid,'subject\tgains\t\t\t\t\t\t\tlosses\t\t\t\t\t\t\tgains\t\t\t\t\t\tlosses\n')
-%         fprintf(fid,'\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\tG_risk25\tG_risk50\tG_risk75\tG_amb24\tG_amb50\tG_amb74\tL_risk25\tL_risk50\tL_risk75\tL_amb24\tL_amb50\tL_amb74\n')
+%         if subj_idx == 1 % write header
+%             fid = fopen(summary_file,'w')
+%             fprintf(fid,'mturk_id\talpha\tbeta\tgamma\tr2\tLL\tAIC\tBIC\texitflag\tmodel\toptimizer\trisk25\trisk50\trisk75\tamb24\tamb50\tamb74\n');
+%         end
+        
+        %write into param text file
+%         fprintf(fid,'%s\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%s\t%s\t%f\t%f\t%f\t%f\t%f\t%f\n',...
+%            subjectNum, info_cstr.b(3), info_cstr.b(2), info_cstr.b(1),...
+%             info_cstr.r2, info_cstr.LL, info_cstr.AIC, info_cstr.BIC, ...
+%             info_cstr.exitflag, info_cstr.model, info_cstr.optimizer,...
+%             riskyChoices_byLevel,ambigChoices_byLevel);
     end
     
     choices_allP = [riskyChoicesP; ambigChoicesP];
@@ -270,7 +327,16 @@ for subj_idx = 1:length(subjects)
 %     save_mat(Data, subjectNum, domain, fitpar_out_path);
 end
 
-fclose(fid)
+% fclose(fid)
+
+% write output into file
+output = table(mturk_id, alpha, beta, gamma, r2, LL, AIC, BIC, exitflag, ...
+    model_name, optimizer, risk25, risk50, risk75, amb24, amb50, amb74);
+
+% writetable(output, summary_file,'Delimiter',',') 
+writetable(output,...
+    'Z:\Lab_Projects\mturk_Columbia\behavioral\model_fit_results\data_by_12082020_500sub\param_nonparam_data_by_12082020_500sub_rerun.csv',...
+    'Delimiter',',') 
 
 toc
 
